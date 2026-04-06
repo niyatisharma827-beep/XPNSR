@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xpnsr — Expense Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── SIDEBAR ─────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo"><span class="logo-dot"></span> Xpnsr</div>
+
+    <div class="nav-section">Menu</div>
+    <div class="nav-item active"><span class="icon">◈</span> Dashboard</div>
+    <div class="nav-item"><span class="icon">≡</span> Expenses</div>
+    <div class="nav-item"><span class="icon">◎</span> Budgets</div>
+    <div class="nav-item"><span class="icon">⬡</span> Categories</div>
+
+    <div class="sidebar-footer">
+      <div class="balance-card">
+        <div class="balance-label">Net Balance</div>
+        <div class="balance-amount" id="sidebar-balance">—</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ──────────────────────────────────────── -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-subtitle" id="date-label"></div>
+      </div>
+      <div class="header-actions">
+
+        <!-- Export dropdown -->
+        <div style="position:relative;">
+          <button class="btn-export" id="export-btn" onclick="toggleExportMenu()">
+            ↓ Export
+          </button>
+          <div class="export-dropdown" id="export-menu">
+            <div class="export-opt" onclick="exportExcel()">
+              <div class="opt-icon" style="background:#1d6f42;color:#fff;">⊞</div>
+              <div>
+                <div class="opt-label">Excel (.xlsx)</div>
+                <div class="opt-sub">Full data with sheets</div>
+              </div>
+            </div>
+            <div class="export-opt" onclick="exportPDF()">
+              <div class="opt-icon" style="background:#cc2222;color:#fff;">⚡</div>
+              <div>
+                <div class="opt-label">PDF Report</div>
+                <div class="opt-sub">Formatted summary</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-add" onclick="openModal()">+ Add Expense</button>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-card green">
+        <div class="stat-label">Total Income</div>
+        <div class="stat-value green" id="stat-income">₹0</div>
+        <div class="stat-sub" id="stat-income-count">0 transactions</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Total Spent</div>
+        <div class="stat-value red" id="stat-spent">₹0</div>
+        <div class="stat-sub" id="stat-spent-count">0 transactions</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Avg / Day</div>
+        <div class="stat-value blue" id="stat-avg">₹0</div>
+        <div class="stat-sub">this month</div>
+      </div>
+    </div>
+
+    <!-- Content grid -->
+    <div class="content-grid">
+
+      <!-- Left: transaction list -->
+      <div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Recent Expenses</div>
+            <div class="filter-tabs">
+              <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+              <button class="filter-tab" onclick="setFilter('expense',this)">Expense</button>
+              <button class="filter-tab" onclick="setFilter('income',this)">Income</button>
+            </div>
+          </div>
+          <div id="expense-list"></div>
+        </div>
+      </div>
+
+      <!-- Right: donut + budgets -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">By Category</div></div>
+          <div class="donut-wrap">
+            <svg width="120" height="120" viewBox="0 0 120 120" id="donut-svg"></svg>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">Budgets</div></div>
+          <div id="budget-list"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ── ADD TRANSACTION MODAL ─────────────────────── -->
+<div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-title">New Transaction</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select class="form-input" id="f-type">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input class="form-input" id="f-amount" type="number" placeholder="0.00" min="0">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input class="form-input" id="f-desc" type="text" placeholder="What was this for?">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-input" id="f-cat">
+          <option value="Food">🍜 Food</option>
+          <option value="Transport">🚌 Transport</option>
+          <option value="Shopping">🛍️ Shopping</option>
+          <option value="Health">💊 Health</option>
+          <option value="Utilities">⚡ Utilities</option>
+          <option value="Entertainment">🎮 Entertainment</option>
+          <option value="Salary">💼 Salary</option>
+          <option value="Other">📦 Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" id="f-date" type="date">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveExpense()">Save Transaction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
+<script src="js/data.js"></script>
+<script src="js/render.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
